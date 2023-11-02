@@ -1,12 +1,12 @@
 #include <ESP8266WiFi.h>
-#include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
 
 // Version 1: Display version number in Serial monitor 
-//       1.1: Request errors shown as yellow * first time, red * repeated times
+//       1.1: Add history display
+//       1.2: Add large number displays for in and out temperature
 
-#define VERSION_NUMBER 1.1
+#define VERSION_NUMBER 1.2
 
 #include <Arduino_JSON.h>
 
@@ -55,6 +55,7 @@ unsigned long successCount = 0;
 #define MY_GREEN 0x07E0
 #define MY_BLACK 0x0000
 #define MY_WHITE 0xFFFF
+#define MY_YELLOW 0x07FF
 
 // Screen line addressing (pixel locations in Y direction, 0 at top)
 #define FIRST_LINE 0
@@ -90,6 +91,10 @@ String windDirectionPcts[8] = {"0", "0", "0", "0", "0", "0", "0", "0"};
 int normalTextClr = MY_WHITE;
 int outsideTextClr = MY_GREEN;
 int insideTextClr = MY_GREEN; // MY_BLUE;
+
+// For display in large font
+String currentOutTemp = "";
+String currentInTemp = "";
 
 // Every 30 minutes record data for 12 hour history
 String tempHist[24];
@@ -212,7 +217,14 @@ void showCurrentData()
       case TEMP:
       {
         displayDataLine("Temp [degF]:   ", String(myArray[0][TEMP]), sInsideTemperature, normalTextClr, outsideTextClr, insideTextClr);
+
+         
         float newTemp = String(myArray[0][TEMP]).toFloat();
+        
+        // Make values to display in large numbers with no decimal places
+        currentOutTemp = String(newTemp,0);
+        currentInTemp = String(sInsideTemperature.toFloat(),0);
+       
         if (newTemp > maxTemp)
         {
           maxTemp = newTemp;
@@ -645,7 +657,10 @@ void loop()
     outsideTextClr = MY_RED;
     insideTextClr = MY_RED;
   } // end if isNightMode()
-  
+
+  // The interval approach to doing things in the loop keeps
+  // processing somewhat separate from however many delay() calls
+  // occur in the loop
   if(currentMillis - previousMillis >= interval) 
   {
     historyShownFlag = false;
@@ -677,11 +692,25 @@ void loop()
   } // end interval check
   else if ((currentMillis - previousMillis >= interval/2) && !historyShownFlag) 
   {
+    // Show history data screen 
     showHistoryData();
+    delay(15000);
     historyShownFlag = true;
+
+    // Display inside and outside temps in large numbers
+    tft.fillScreen(MY_BLACK);  // erase screen
+    tft.setTextColor(MY_YELLOW, MY_BLACK);     
+    tft.setTextSize(9);                
+    tft.setCursor(LINE_BEGIN_X, FIRST_LINE+4*LINE_SPACE);              
+    tft.print(currentInTemp);
+    delay(7000);
+    tft.fillScreen(MY_BLACK);  // erase screen
+    tft.setTextColor(MY_GREEN, MY_BLACK);     
+    tft.setTextSize(9);                
+    tft.setCursor(LINE_BEGIN_X, FIRST_LINE+4*LINE_SPACE);              
+    tft.print(currentOutTemp);
+    delay(7000);
+    
   }
-
-
-
   
 } // end loop()
